@@ -1,0 +1,7 @@
+---
+- name: Deploy Helm
+  hosts: master
+  vars_files:
+    - group_vars/vars.yml
+  roles:
+    - metallb

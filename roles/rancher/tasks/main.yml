@@ -1,0 +1,2 @@
+---
+- include_tasks: rancher_deploy.yml

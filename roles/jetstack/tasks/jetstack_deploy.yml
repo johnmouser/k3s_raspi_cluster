@@ -1,0 +1,24 @@
+---
+- name: Check if Jetstack is installed
+  shell: kubectl get deployments -n cert-manager
+  register: cert_manager_status
+  ignore_errors: true
+  changed_when: false 
+
+- name: Setup Jetstack
+  shell: helm install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace --set crds.enabled=true
+  environment:
+      KUBECONFIG: "/etc/rancher/k3s/k3s.yaml"
+  register: helm_install
+  when: cert_manager_status.stdout == ''
+
+- name: Wait for jetstack pods to be ready
+  shell: kubectl get pods -n cert-manager -o jsonpath='{.items[*].status.phase}'
+  register: jetstack_pods
+  until: "'Running' in jetstack_pods.stdout"
+  retries: 10
+  delay: 5
+  when: cert_manager_status.stdout == ''
+
+
+

@@ -1,0 +1,18 @@
+---
+- name: Check current cmdline.txt content
+  shell: cat /boot/firmware/cmdline.txt
+  register: cmdlineContent
+  changed_when: false
+
+- name: Modify cmdline.txt to enable cgroups if not already set
+  shell: sed -i -e 's/\(.*\)/\1 cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory/' /boot/firmware/cmdline.txt
+  register: cgroup_change
+  when: "'cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory' not in cmdlineContent.stdout"
+  changed_when: cgroup_change is changed
+  become: true
+
+- name: Restart the Pi if cgroups were changed
+  reboot:
+    reboot_timeout: 60  
+  when: cgroup_change.changed
+  become: true

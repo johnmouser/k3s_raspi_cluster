@@ -1,0 +1,22 @@
+- name: Load Helm variables
+  include_vars: vars/helm_vars.yml
+
+- name: Get current Helm repositories
+  shell: helm repo list -o json
+  register: helm_repos
+  changed_when: false 
+
+- name: Add each Helm repository if not already added
+  shell: helm repo add {{ item.name }} {{ item.url }}
+  register: helm_repo_result
+  with_items: "{{ helm_repositories }}"
+  when: item.name not in helm_repos.stdout | from_json | map(attribute='name') | list
+
+- name: Set a fact if any repositories were added
+  set_fact:
+    repos_added: true
+  when: helm_repo_result is changed
+
+- name: Update Helm repositories
+  shell: helm repo update
+  when: repos_added | default(false) 

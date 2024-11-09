@@ -1,0 +1,2 @@
+---
+- include_tasks: sharedstorage_deploy.yml

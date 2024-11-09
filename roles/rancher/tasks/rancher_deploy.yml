@@ -1,0 +1,71 @@
+---
+- name: Check for rancher namespace
+  shell: kubectl get namespace cattle-system
+  register: namespace_check
+  ignore_errors: true
+  changed_when: false
+
+- name: Create Rancher namespace
+  shell: kubectl create namespace cattle-system
+  when: namespace_check.rc != 0
+
+- name: Check if Rancher is installed
+  shell: kubectl get deployments -n cattle-system rancher
+  register: rancher_status
+  ignore_errors: true
+  changed_when: false
+
+- block:
+    - name: Install Rancher Ingress Controller
+      shell: |
+        helm install rancher rancher-stable/rancher --namespace cattle-system --set hostname=rancher.local --set bootstrapPassword=admin
+      environment:
+          KUBECONFIG: "/etc/rancher/k3s/k3s.yaml"
+      register: helm_install
+      failed_when: helm_install.rc != 0
+
+    - name: Wait for Rancher pods to be ready
+      shell: kubectl get pods -n cattle-system -o jsonpath='{.items[*].status.phase}'
+      register: rancher_pods
+      until: "'Running' in rancher_pods.stdout"
+      retries: 10
+      delay: 60
+
+    - name: Wait for Rancher components to stabilize
+      pause:
+        seconds: 30
+
+    - name: Create Ingress YAML file
+      copy:
+        content: |
+          apiVersion: networking.k8s.io/v1
+          kind: Ingress
+          metadata:
+            name: rancher-ingress
+            namespace: cattle-system
+            annotations:
+              kubernetes.io/ingress.class: nginx
+              nginx.org/websocket-services: rancher
+              nginx.ingress.kubernetes.io/rewrite-target: /
+          spec:
+            tls:
+            - hosts:
+              - rancher.local
+              secretName: tls-rancher-ingress
+            rules:
+            - host: rancher.local
+              http:
+                paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: rancher   # Service name
+                      port:
+                        number: 80  # Port number
+        dest: /tmp/rancher-ingress.yaml
+
+    - name: Apply Ingress configuration
+      shell: kubectl apply -f /tmp/rancher-ingress.yaml
+
+  when: rancher_status.stdout == ''

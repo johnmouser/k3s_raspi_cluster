@@ -1,0 +1,6 @@
+---
+- name: Deploy Shared Storage
+  hosts: storage_node
+  become: true
+  roles:
+    - shared_storage

@@ -1,0 +1,2 @@
+metallb_range: "192.168.0.245-192.168.0.254"
+k3s_token: "server:Token!123"

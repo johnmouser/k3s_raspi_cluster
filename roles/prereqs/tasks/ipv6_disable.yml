@@ -1,0 +1,19 @@
+- name: Check current sysctl.conf content
+  shell: cat /etc/sysctl.conf
+  register: sysctlContent
+  changed_when: false
+
+- name: Add net.ipv6.conf.eth0.disable_ipv6 = 1 to /etc/sysctl.conf
+  become: true
+  lineinfile:
+    path: /etc/sysctl.conf
+    line: 'net.ipv6.conf.eth0.disable_ipv6 = 1'
+    state: present
+    create: yes
+    validate: '/usr/sbin/sysctl -p'
+  when: "'net.ipv6.conf.eth0.disable_ipv6' not in sysctlContent.stdout"
+
+- name: Apply sysctl settings to disable IPv6
+  become: true
+  command: sysctl -p
+  when: "'net.ipv6.conf.eth0.disable_ipv6' not in sysctlContent.stdout"

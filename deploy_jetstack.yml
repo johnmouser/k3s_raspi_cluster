@@ -1,0 +1,4 @@
+- name: Deploy =Jetstack
+  hosts: master
+  roles:
+    - jetstack

@@ -1,0 +1,23 @@
+---
+- name: Check if nginx-ingress is installed
+  shell: kubectl get deployments -n nginx-ingress
+  register: nginx_status
+  ignore_errors: true
+  changed_when: false 
+
+- name: Install NGINX Ingress Controller
+  shell: helm install nginx nginx-stable/nginx-ingress -n nginx-ingress
+  environment:
+      KUBECONFIG: "/etc/rancher/k3s/k3s.yaml"
+  register: helm_install
+  failed_when: helm_install.rc != 0
+  when: nginx_status.stdout == ''
+
+- name: Wait for NGINX Ingress Controller pods to be ready
+  shell: kubectl get pods -n nginx-ingress -o jsonpath='{.items[*].status.phase}'
+  register: nginx_pods
+  until: "'Running' in nginx_pods.stdout"
+  retries: 10
+  delay: 5
+  when: nginx_status.stdout == ''
+

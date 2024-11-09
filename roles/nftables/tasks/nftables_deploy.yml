@@ -1,0 +1,75 @@
+---
+- name: Start nftables service
+  service:
+    name: nftables
+    state: started
+
+- name: Enable nftables service to start on boot
+  service:
+    name: nftables
+    enabled: yes
+
+- name: Set k3s_server variable
+  set_fact:
+    k3s_server: "{{ groups['master'][0] }}"
+
+- name: Set Agent0 variable
+  set_fact:
+    k3s_agent1: "{{ groups['agents'][0] }}"
+
+- name: Set Agent1 variable
+  set_fact:
+    k3s_agent2: "{{ groups['agents'][1] }}"
+
+- name: Copy custom nftables configuration
+  become: true 
+  copy:
+    content: |
+      #!/usr/sbin/nft -f
+
+      flush ruleset
+
+      table inet filter {
+          chain input {
+              type filter hook input priority filter; policy drop; # deny by default
+
+              # Allow incoming packets that are part of an established or related connection
+              ct state established,related accept
+
+              # Allow incoming packets from k3s related cluster addresses
+              ip saddr {{ k3s_server }} accept
+              ip saddr {{ k3s_agent1 }} accept
+              ip saddr {{ k3s_agent2 }} accept
+              ip saddr 10.42.0.0/24 accept
+              ip saddr 10.42.1.0/24 accept
+              ip saddr 10.42.2.0/24 accept
+
+              # Allow ICMP
+              ip protocol icmp accept
+
+              # Allow inbound ports from LAN
+              tcp dport { 22, 80, 443, 53, 5353 } accept
+              udp dport { 53, 5353 } accept
+
+              # Allow loopback communication
+              iifname lo accept
+          }
+          chain forward {
+              type filter hook forward priority filter;
+          }
+          chain output {
+              type filter hook output priority filter; policy accept;
+          }
+      }
+    dest: /etc/nftables.conf
+    mode: '0644'
+    owner: root
+    group: root
+    register: nftables_config
+
+- name: Restart nftables service to apply new rules
+  become: true
+  service:
+    name: nftables
+    state: restarted
+  when: nftables_config is defined and nftables_config.changed

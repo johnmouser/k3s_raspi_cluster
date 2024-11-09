@@ -1,0 +1,56 @@
+---
+- name: Check if MetalLB is installed
+  shell: kubectl get deployments -n metallb-system
+  register: metallb_status
+  ignore_errors: true
+  changed_when: false 
+
+- block: 
+    - name: Install MetalLB
+      shell: kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.14.8/config/manifests/metallb-native.yaml
+      register: metallb_installation
+
+    - name: Wait for MetalLB containers to be created
+      shell: kubectl get pods -n metallb-system -o jsonpath='{.items[*].status.phase}'
+      register: metallb_pods
+      until: "'Running' in metallb_pods.stdout"
+      retries: 10
+      delay: 10
+
+    - name: Create IPAddressPool resource
+      copy:
+        content: |
+          apiVersion: metallb.io/v1beta1
+          kind: IPAddressPool
+          metadata: 
+            name: default
+            namespace: metallb-system
+          spec:
+            addresses:
+              - "{{ metallb_range }}"
+            autoAssign: true
+        dest: /tmp/ipaddresspool.yaml
+
+    - name: Create L2Advertisement resource
+      copy:
+        content: |
+          apiVersion: metallb.io/v1beta1
+          kind: L2Advertisement
+          metadata:
+            name: default
+            namespace: metallb-system
+          spec:
+            ipAddressPools:
+              - default
+        dest: /tmp/l2advertisement.yaml
+
+    - name: Apply IPAddressPool and L2Advertisement configuration
+      shell: |
+        kubectl apply -f /tmp/ipaddresspool.yaml
+        kubectl apply -f /tmp/l2advertisement.yaml
+      register: ipaddresspool_result
+      retries: 5
+      delay: 10
+      until: ipaddresspool_result.rc == 0
+
+  when: metallb_status.stdout == ''
