@@ -41,16 +41,7 @@ metallb_range: "x.x.x.x-x.x.x.x"   # IP range for MetalLB to assign to services 
 k3s_token: "*****"   # Add a cluster token here 
 ```
 
-### 3. **Optional: Host-based Firewall Configuration (nftables)**
-
-```
-Rules configured include ICMP, SSH, HTTP, HTTPS and DNS from your LAN
-
-If you do **NOT** want a host-based firewall, remove nftables role from 
-master and agents in deploy_k3s.yml.
-```
-
-### 4. **Execute Playbook**
+### 3. **Execute Playbook**
 
 ```
 ansible-playbook -i inventory.ini site.yml

@@ -6,7 +6,6 @@
   roles:
     - prereqs
     - k3s_master
-    - nftables
 
 - name: Deploy k3s workers
   hosts: agents
@@ -15,4 +14,3 @@
   roles:
     - prereqs
     - k3s_agent
-    - nftables
